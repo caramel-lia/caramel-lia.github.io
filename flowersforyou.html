@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>For Angela Niña Arceta</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Cormorant Garamond', serif;
+            background: radial-gradient(circle at 50% 0%, #1e1b4b, #0f172a 60%, #020617 100%);
+        }
+        .font-display { font-family: 'Playfair Display', serif; }
+        
+        @keyframes growStem {
+            0% { stroke-dashoffset: 300; }
+            100% { stroke-dashoffset: 0; }
+        }
+        
+        @keyframes bloom {
+            0% { opacity: 0; transform: scale(0) rotate(-10deg); }
+            60% { transform: scale(1.1) rotate(2deg); }
+            100% { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+
+        @keyframes sway {
+            0%, 100% { transform: rotate(var(--sway-rot)); }
+            50% { transform: rotate(calc(var(--sway-rot) + 3deg)); }
+        }
+
+        .stem {
+            stroke-dasharray: 300;
+            stroke-dashoffset: 300;
+            animation: growStem 1.5s ease-out forwards;
+            transform-origin: bottom center;
+        }
+
+        .flower-head {
+            transform-origin: center center;
+            animation: bloom 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, 
+                       sway 5s ease-in-out infinite;
+            animation-delay: var(--delay), calc(var(--delay) + 1.2s);
+            opacity: 0;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+        }
+
+        .particle {
+            position: absolute;
+            background: radial-gradient(circle, rgba(167, 139, 250, 0.6) 0%, rgba(167, 139, 250, 0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float 10s infinite ease-in-out;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+            50% { opacity: 0.5; }
+            100% { transform: translateY(-120px) translateX(30px); opacity: 0; }
+        }
+    </style>
+</head>
+<!-- FIXED: Removed overflow-hidden, added overflow-x-hidden to allow vertical scrolling -->
+<body class="min-h-screen w-full text-slate-200 flex items-center justify-center p-4 md:p-8 relative overflow-x-hidden">
+
+    <!-- FIXED: Changed to 'fixed' so particles stay in background while scrolling -->
+    <div id="particles-container" class="fixed inset-0 pointer-events-none z-0"></div>
+
+    <!-- Main Content -->
+    <div class="relative z-10 w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
+        
+        <!-- LEFT: The Dedication & Poem (Order 1 on mobile so it's at the top) -->
+        <div class="order-1 flex flex-col items-center lg:items-start text-center lg:text-left space-y-6 md:space-y-8">
+            <div class="space-y-2">
+                <p class="text-purple-300 tracking-[0.25em] text-sm uppercase font-semibold">A Dedicated Bouquet</p>
+                <h1 class="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-200 via-blue-200 to-purple-200 leading-tight">
+                    Angela Niña<br>Arceta
+                </h1>
+            </div>
+
+            <div class="glass-card p-6 md:p-10 rounded-2xl max-w-md relative w-full">
+                <div class="absolute -top-4 -left-2 text-6xl text-purple-400/30 font-display">"</div>
+                
+                <p class="text-lg md:text-2xl leading-relaxed text-purple-100 italic font-medium relative z-10">
+                    Like petals of blue and shades of deep purple,<br>
+                    Your spirit blooms, a beautiful marvel.<br>
+                    In every hue, a story is told,<br>
+                    Of a heart so kind, and a soul so bold.<br><br>
+                    May this garden of colors bright,<br>
+                    Fill your days with joy and light.
+                </p>
+                
+                <div class="mt-6 md:mt-8 flex items-center justify-center lg:justify-start space-x-3 text-purple-300/60 text-sm tracking-widest uppercase">
+                    <span class="h-px w-10 bg-purple-300/40"></span>
+                    <span>With admiration</span>
+                    <span class="h-px w-10 bg-purple-300/40"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: The Unified Artistic Bouquet (Order 2 on mobile, so it's below the poem) -->
+        <div class="order-2 relative w-full flex items-center justify-center py-8 lg:py-0">
+            <!-- Decorative glow behind bouquet -->
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 md:w-80 md:h-80 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <svg id="bouquet-svg" viewBox="0 0 400 500" class="w-full max-w-sm md:max-w-md drop-shadow-2xl" xmlns="http://www.w3.org/2000/svg">
+                <defs></defs>
+            </svg>
+        </div>
+
+    </div>
+
+    <script>
+        const svg = document.getElementById('bouquet-svg');
+        const defs = svg.querySelector('defs');
+        const particlesContainer = document.getElementById('particles-container');
+
+        const petalColors = [
+            { inner: '#C084FC', outer: '#7E22CE' },
+            { inner: '#818CF8', outer: '#3730A3' },
+            { inner: '#60A5FA', outer: '#1E40AF' },
+            { inner: '#A855F7', outer: '#6B21A8' },
+            { inner: '#93C5FD', outer: '#2563EB' }
+        ];
+
+        // Create ambient floating particles
+        for (let i = 0; i < 25; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.width = Math.random() * 6 + 2 + 'px';
+            p.style.height = p.style.width;
+            p.style.left = Math.random() * 100 + '%';
+            p.style.top = (Math.random() * 100) + '%';
+            p.style.animationDelay = Math.random() * 8 + 's';
+            p.style.animationDuration = (Math.random() * 6 + 8) + 's';
+            particlesContainer.appendChild(p);
+        }
+
+        const flowers = [
+            { x: 200, y: 90, scale: 1.2, delay: 0.1, colorIdx: 0 },
+            { x: 130, y: 140, scale: 1.0, delay: 0.3, colorIdx: 1 },
+            { x: 270, y: 140, scale: 1.0, delay: 0.5, colorIdx: 2 },
+            { x: 80, y: 210, scale: 0.85, delay: 0.7, colorIdx: 3 },
+            { x: 320, y: 210, scale: 0.85, delay: 0.9, colorIdx: 4 },
+            { x: 160, y: 190, scale: 0.95, delay: 1.1, colorIdx: 0 },
+            { x: 240, y: 190, scale: 0.95, delay: 1.3, colorIdx: 1 },
+            { x: 200, y: 230, scale: 1.1, delay: 1.5, colorIdx: 2 },
+            { x: 110, y: 270, scale: 0.75, delay: 1.7, colorIdx: 3 },
+            { x: 290, y: 270, scale: 0.75, delay: 1.9, colorIdx: 4 },
+        ];
+
+        flowers.sort((a, b) => a.y - b.y);
+
+        flowers.forEach((f, index) => {
+            const color = petalColors[f.colorIdx];
+            const gradId = `grad-${index}`;
+            
+            const gradient = document.createElementNS("http://www.w3.org/2000/svg", "radialGradient");
+            gradient.setAttribute("id", gradId);
+            gradient.setAttribute("cx", "50%");
+            gradient.setAttribute("cy", "50%");
+            gradient.setAttribute("r", "50%");
+            gradient.innerHTML = `<stop offset="0%" stop-color="${color.inner}"/><stop offset="100%" stop-color="${color.outer}"/>`;
+            defs.appendChild(gradient);
+
+            const cp1x = 200;
+            const cp1y = f.y + 180;
+            const cp2x = f.x;
+            const cp2y = f.y + 180;
+            
+            const stemPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            stemPath.setAttribute("d", `M 200 380 C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${f.x} ${f.y}`);
+            stemPath.setAttribute("stroke", "#064E3B");
+            stemPath.setAttribute("stroke-width", "3");
+            stemPath.setAttribute("fill", "none");
+            stemPath.setAttribute("stroke-linecap", "round");
+            stemPath.classList.add("stem");
+            stemPath.style.animationDelay = `${f.delay}s`;
+            svg.appendChild(stemPath);
+
+            const midX = (200 + f.x) / 2;
+            const midY = (380 + f.y) / 2 + 40;
+            const leafDirection = f.x < 200 ? -1 : 1;
+            const leaf = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            leaf.setAttribute("d", `M ${midX} ${midY} Q ${midX + (30 * leafDirection)} ${midY - 20} ${midX + (40 * leafDirection)} ${midY + 10} Q ${midX + (10 * leafDirection)} ${midY + 10} ${midX} ${midY}`);
+            leaf.setAttribute("fill", "#059669");
+            leaf.setAttribute("opacity", "0.9");
+            leaf.classList.add("stem");
+            leaf.style.animationDelay = `${f.delay}s`;
+            svg.appendChild(leaf);
+
+            const headGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            headGroup.classList.add("flower-head");
+            headGroup.style.setProperty('--delay', `${f.delay + 0.4}s`);
+            headGroup.style.setProperty('--sway-rot', `${(f.x - 200) / 10}deg`);
+            
+            const angle = Math.atan2(f.y - 380, f.x - 200) * (180 / Math.PI) + 90;
+            
+            headGroup.innerHTML = `
+                <g transform="translate(${f.x}, ${f.y}) scale(${f.scale}) rotate(${angle})">
+                    ${[0, 60, 120, 180, 240, 300].map((_, i) => `
+                        <ellipse cx="0" cy="-22" rx="13" ry="28" fill="url(#${gradId})" transform="rotate(${i * 60})" opacity="0.95"/>
+                    `).join('')}
+                    ${[30, 90, 150, 210, 270].map((_, i) => `
+                        <ellipse cx="0" cy="-16" rx="9" ry="20" fill="${color.inner}" transform="rotate(${i * 60})" opacity="0.9"/>
+                    `).join('')}
+                    <circle cx="0" cy="0" r="9" fill="#FEF08A"/>
+                    <circle cx="0" cy="0" r="4" fill="#F59E0B"/>
+                </g>
+            `;
+            svg.appendChild(headGroup);
+        });
+
+        const wrapperGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        wrapperGroup.innerHTML = `
+            <path d="M 150 360 L 250 360 L 280 480 Q 200 500 120 480 Z" fill="url(#wrap-grad)" stroke="#4c1d95" stroke-width="1"/>
+            <defs>
+                <linearGradient id="wrap-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#4c1d95"/>
+                    <stop offset="100%" stop-color="#2e1065"/>
+                </linearGradient>
+            </defs>
+            <g transform="translate(200, 360)">
+                <path d="M 0 0 C -30 -20, -40 10, 0 15 Z" fill="#7c3aed" stroke="#6d28d9" stroke-width="1"/>
+                <path d="M 0 0 C 30 -20, 40 10, 0 15 Z" fill="#7c3aed" stroke="#6d28d9" stroke-width="1"/>
+                <circle cx="0" cy="5" r="6" fill="#5b21b6"/>
+                <path d="M -3 10 Q -10 40, -5 60" stroke="#7c3aed" stroke-width="4" fill="none" stroke-linecap="round"/>
+                <path d="M 3 10 Q 10 40, 5 60" stroke="#7c3aed" stroke-width="4" fill="none" stroke-linecap="round"/>
+            </g>
+        `;
+        svg.appendChild(wrapperGroup);
+    </script>
+</body>
+</html>
