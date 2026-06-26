@@ -4,245 +4,238 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PoC</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0e14;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+        }
+        #output {
+            background: #1a1f2a;
+            color: #00ff88;
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid #00ff88;
+            max-width: 800px;
+            width: 100%;
+            min-height: 400px;
+            font-size: 14px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-break: break-all;
+            box-shadow: 0 0 30px rgba(0,255,136,0.1);
+            overflow: auto;
+        }
+        #output .success { color: #00ff88; }
+        #output .info { color: #66b3ff; }
+        #output .warning { color: #ffaa44; }
+        #output .error { color: #ff4466; }
+        #output .cookie { color: #ff66ff; }
+        #output .ip { color: #ffcc00; }
+        #output .location { color: #66ffcc; }
+        #output .header { 
+            color: #ffffff; 
+            font-weight: bold;
+            font-size: 18px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 1.5s infinite;
+        }
+        .status-dot.active { background: #00ff88; }
+        .status-dot.waiting { background: #ffaa44; }
+        .status-dot.error { background: #ff4466; }
+        @keyframes pulse {
+            0% { opacity: 0.4; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.4; transform: scale(0.9); }
+        }
+        #log {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+            color: #8899bb;
+            font-size: 12px;
+        }
+    </style>
 </head>
 <body>
+<div id="output">
+    <div class="header">🔐 PWN2OWN CTF - PoC</div>
+    <div id="log">[⏳] Initializing...</div>
+</div>
+
 <script>
 // ============================================================
-// PWN2OWN CTF - PoC
-// Camera bypass + alert + save to photos + document.cookie
+// PWN2OWN CTF - PoC (No camera)
+// IP & Location + document.cookie
 // ============================================================
 
 (function() {
     "use strict";
 
-    // 1. ALERT - "cheese"
-    alert("🧀 cheese");
+    const output = document.getElementById('output');
+    const logElement = document.getElementById('log');
 
-    // 2. CAMERA BYPASS TECHNIQUES
-    function captureSelfie() {
-        // Technique 1: Try getUserMedia with silent mode
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            // Request with minimal permissions - some browsers auto-approve
-            var constraints = {
-                video: {
-                    facingMode: "user",
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
-                    // These flags might bypass permission prompts on some browsers
-                    mandatory: {
-                        chromeMediaSource: 'camera'
-                    }
-                },
-                audio: false // no audio permission needed
-            };
-            
-            navigator.mediaDevices.getUserMedia(constraints)
-                .then(function(stream) {
-                    processStream(stream);
-                })
-                .catch(function(err) {
-                    // Technique 2: If blocked, try with different constraints
-                    alert("📸 camera blocked, trying bypass...");
-                    
-                    // Try with minimal resolution
-                    var fallbackConstraints = {
-                        video: {
-                            facingMode: "user",
-                            width: { ideal: 320 },
-                            height: { ideal: 240 }
-                        }
-                    };
-                    
-                    navigator.mediaDevices.getUserMedia(fallbackConstraints)
-                        .then(function(stream) {
-                            processStream(stream);
-                        })
-                        .catch(function(err2) {
-                            // Technique 3: Try getUserMedia with no specific constraints
-                            alert("📸 camera still blocked, trying last resort...");
-                            navigator.mediaDevices.getUserMedia({ video: true })
-                                .then(function(stream) {
-                                    processStream(stream);
-                                })
-                                .catch(function(err3) {
-                                    alert("📸 camera denied: " + err3.message);
-                                    // Fallback: generate fake selfie
-                                    generateFakeSelfie();
-                                });
-                        });
-                });
-        } else {
-            alert("📸 getUserMedia not supported");
-            generateFakeSelfie();
-        }
-    }
-
-    function processStream(stream) {
-        var video = document.createElement('video');
-        video.style.display = 'none';
-        video.srcObject = stream;
-        video.onloadedmetadata = function() {
-            video.play();
-            setTimeout(function() {
-                var canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth || 640;
-                canvas.height = video.videoHeight || 480;
-                var ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // Stop all tracks
-                stream.getTracks().forEach(function(track) { track.stop(); });
-                
-                // Save to photos
-                saveToPhotos(canvas);
-                
-            }, 300);
+    function appendLog(message, type = 'info') {
+        const classes = {
+            'info': 'info',
+            'success': 'success',
+            'error': 'error',
+            'warning': 'warning',
+            'cookie': 'cookie',
+            'ip': 'ip',
+            'location': 'location'
         };
-        document.body.appendChild(video);
+        const className = classes[type] || 'info';
+        logElement.innerHTML += `<div class="${className}">${message}</div>`;
+        // Auto-scroll
+        output.scrollTop = output.scrollHeight;
     }
 
-    function saveToPhotos(canvas) {
-        canvas.toBlob(function(blob) {
-            if (!blob) {
-                alert("📸 failed to capture");
-                return;
-            }
-            
-            // iOS: use webkit to save
-            if (navigator.userAgent.match(/iPhone|iPad|iPod/i)) {
-                var link = document.createElement('a');
-                link.download = 'selfie_' + Date.now() + '.jpg';
-                link.href = URL.createObjectURL(blob);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(function() {
-                    URL.revokeObjectURL(link.href);
-                }, 1000);
-                alert("📸 selfie saved to Photos app");
-            }
-            // Android
-            else if (navigator.userAgent.match(/Android/i)) {
-                var link = document.createElement('a');
-                link.download = 'selfie_' + Date.now() + '.jpg';
-                link.href = URL.createObjectURL(blob);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(function() {
-                    URL.revokeObjectURL(link.href);
-                }, 1000);
-                alert("📸 selfie saved to Gallery");
-            }
-            // Desktop
-            else {
-                var link = document.createElement('a');
-                link.download = 'selfie_' + Date.now() + '.jpg';
-                link.href = URL.createObjectURL(blob);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(function() {
-                    URL.revokeObjectURL(link.href);
-                }, 1000);
-                alert("📸 selfie downloaded");
-            }
-            
-            // Store as base64 in sessionStorage
-            try {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    sessionStorage.setItem('poc_selfie', e.target.result);
-                };
-                reader.readAsDataURL(blob);
-            } catch(e) {}
-            
-        }, 'image/jpeg', 0.95);
-    }
+    // 1. Show initial status
+    appendLog('[✅] PoC started', 'success');
+    appendLog('[📱] Platform: ' + navigator.userAgent.match(/iPhone|iPad|iPod/i) ? 'iOS' : 
+              navigator.userAgent.match(/Android/i) ? 'Android' : 'Desktop', 'info');
 
-    function generateFakeSelfie() {
-        // Generate a fake selfie when camera is blocked
-        var canvas = document.createElement('canvas');
-        canvas.width = 640;
-        canvas.height = 480;
-        var ctx = canvas.getContext('2d');
-        
-        // Draw a "selfie" placeholder
-        ctx.fillStyle = '#2d3748';
-        ctx.fillRect(0, 0, 640, 480);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '30px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('📸 Camera Blocked', 320, 200);
-        ctx.font = '20px Arial';
-        ctx.fillText('(fallback selfie)', 320, 260);
-        
-        // Draw a simple face
-        ctx.beginPath();
-        ctx.arc(320, 150, 60, 0, Math.PI * 2);
-        ctx.fillStyle = '#f5cba7';
-        ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.arc(300, 140, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(340, 140, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(320, 170, 20, 0, Math.PI);
-        ctx.stroke();
-        
-        saveToPhotos(canvas);
-    }
+    // 2. Get IP and location using ip-api.com (similar to iCanHazIP)
+    appendLog('[🌐] Fetching IP and location data...', 'info');
 
-    // 3. DOCUMENT COOKIES
+    fetch('http://ip-api.com/json/')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                // Display IP
+                appendLog(`[🌐] IP Address: ${data.query}`, 'ip');
+                
+                // Display location details
+                appendLog(`[📍] Location: ${data.city}, ${data.regionName}, ${data.country}`, 'location');
+                appendLog(`[📍] Coordinates: ${data.lat}, ${data.lon}`, 'location');
+                appendLog(`[📍] ISP: ${data.isp}`, 'location');
+                appendLog(`[📍] Timezone: ${data.timezone}`, 'location');
+                appendLog(`[📍] ZIP Code: ${data.zip}`, 'location');
+                
+                // Store in sessionStorage
+                try {
+                    sessionStorage.setItem('ip_info', JSON.stringify(data));
+                } catch(e) {}
+                
+                appendLog('[✅] IP and location data captured', 'success');
+            } else {
+                appendLog('[❌] Failed to get location data: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            appendLog('[❌] Error fetching IP: ' + error.message, 'error');
+            
+            // Fallback: try alternative API
+            appendLog('[🔄] Trying fallback API...', 'warning');
+            fetch('https://api.ipify.org?format=json')
+                .then(res => res.json())
+                .then(data => {
+                    appendLog(`[🌐] IP Address (fallback): ${data.ip}`, 'ip');
+                })
+                .catch(err => {
+                    appendLog('[❌] Fallback also failed: ' + err.message, 'error');
+                });
+        });
+
+    // 3. Document Cookies
     function showCookies() {
         var cookieStr = document.cookie || '(no cookies)';
-        alert("🍪 document.cookie:\n" + cookieStr);
+        appendLog('[🍪] document.cookie:', 'cookie');
+        appendLog(`[🍪] ${cookieStr}`, 'cookie');
         
-        // Set test cookie if empty
-        if (document.cookie === '') {
+        // Try to parse cookies
+        if (document.cookie !== '') {
+            try {
+                var cookies = document.cookie.split(';');
+                cookies.forEach(function(c) {
+                    var parts = c.trim().split('=');
+                    if (parts.length === 2) {
+                        appendLog(`[🍪] ${parts[0]}: ${parts[1]}`, 'cookie');
+                    }
+                });
+            } catch(e) {}
+        } else {
+            // Set test cookie if empty
             document.cookie = "poc_test=1; path=/";
-            alert("🍪 cookie set: " + document.cookie);
+            appendLog('[🍪] Test cookie set: poc_test=1', 'cookie');
+            appendLog('[🍪] Cookie now: ' + document.cookie, 'cookie');
         }
-        
-        // Try to read all cookies via different methods
-        try {
-            // Try to access cookies via document.cookie
-            var cookies = document.cookie.split(';');
-            var cookieObj = {};
-            cookies.forEach(function(c) {
-                var parts = c.trim().split('=');
-                if (parts.length === 2) {
-                    cookieObj[parts[0]] = parts[1];
-                }
-            });
-            console.log('[PoC] Cookies:', cookieObj);
-        } catch(e) {}
     }
 
-    // 4. Platform detection
-    function getPlatform() {
+    // 4. Browser information
+    function getBrowserInfo() {
         var ua = navigator.userAgent;
-        if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
-        else if (/Android/.test(ua)) return 'Android';
-        else return 'Desktop';
+        var browser = 'Unknown';
+        if (ua.indexOf('Chrome') > -1) browser = 'Chrome';
+        else if (ua.indexOf('Safari') > -1) browser = 'Safari';
+        else if (ua.indexOf('Firefox') > -1) browser = 'Firefox';
+        else if (ua.indexOf('Edge') > -1) browser = 'Edge';
+        else if (ua.indexOf('Opera') > -1) browser = 'Opera';
+        
+        appendLog(`[🖥️] Browser: ${browser}`, 'info');
+        appendLog(`[📱] User Agent: ${ua.substring(0, 60)}...`, 'info');
+        appendLog(`[📐] Screen: ${screen.width}x${screen.height}`, 'info');
+        appendLog(`[💾] Language: ${navigator.language}`, 'info');
     }
 
-    // 5. Execute everything
-    alert("📱 Platform: " + getPlatform());
-    
-    // Attempt camera capture
-    captureSelfie();
-    
-    // Show cookies
-    setTimeout(showCookies, 500);
-    
-    // Final confirmation
-    setTimeout(function() {
-        alert("✅ PoC complete\n- alert: cheese\n- selfie: attempted (check Photos)\n- cookie: " + (document.cookie || 'empty'));
-    }, 2000);
+    // 5. Execute everything with delays
+    setTimeout(() => {
+        showCookies();
+    }, 500);
+
+    setTimeout(() => {
+        getBrowserInfo();
+    }, 800);
+
+    // 6. Final status after all data is gathered
+    setTimeout(() => {
+        appendLog('', 'info');
+        appendLog('═══════════════════════════════════', 'info');
+        appendLog('[✅] PoC Complete', 'success');
+        appendLog('[🔑] All data captured:', 'success');
+        appendLog('   • IP & Location ✓', 'success');
+        appendLog('   • Cookies ✓', 'success');
+        appendLog('   • Browser Info ✓', 'success');
+        appendLog('[💾] Data stored in sessionStorage', 'success');
+        
+        // Try to get saved IP data
+        try {
+            var saved = sessionStorage.getItem('ip_info');
+            if (saved) {
+                var parsed = JSON.parse(saved);
+                appendLog(`[📊] Full Data: ${saved.substring(0, 100)}...`, 'info');
+            }
+        } catch(e) {}
+        
+        // Add live status dot
+        const statusDiv = document.createElement('div');
+        statusDiv.style.cssText = 'margin-top: 10px; display: flex; align-items: center;';
+        statusDiv.innerHTML = `
+            <span class="status-dot active"></span>
+            <span style="color: #00ff88; font-size: 12px;">Live - Data captured</span>
+        `;
+        logElement.appendChild(statusDiv);
+    }, 1500);
 
 })();
 </script>
