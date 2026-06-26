@@ -79,8 +79,9 @@
 
 <script>
 // ============================================================
-// PWN2OWN CTF - PoC (No camera)
-// IP & Location + document.cookie
+// PWN2OWN CTF - PoC (No camera, no GPS)
+// IP-based geolocation only + document.cookie
+// Multiple API fallbacks
 // ============================================================
 
 (function() {
@@ -88,6 +89,7 @@
 
     const output = document.getElementById('output');
     const logElement = document.getElementById('log');
+    let ipDataCaptured = false;
 
     function appendLog(message, type = 'info') {
         const classes = {
@@ -101,61 +103,230 @@
         };
         const className = classes[type] || 'info';
         logElement.innerHTML += `<div class="${className}">${message}</div>`;
-        // Auto-scroll
         output.scrollTop = output.scrollHeight;
     }
 
     // 1. Show initial status
     appendLog('[✅] PoC started', 'success');
-    appendLog('[📱] Platform: ' + navigator.userAgent.match(/iPhone|iPad|iPod/i) ? 'iOS' : 
-              navigator.userAgent.match(/Android/i) ? 'Android' : 'Desktop', 'info');
+    appendLog('[📱] Platform: ' + (/iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'iOS' : 
+              /Android/i.test(navigator.userAgent) ? 'Android' : 'Desktop'), 'info');
 
-    // 2. Get IP and location using ip-api.com (similar to iCanHazIP)
-    appendLog('[🌐] Fetching IP and location data...', 'info');
+    // 2. Get IP and location using IP APIs only (no GPS)
+    function getIPAndLocation() {
+        appendLog('[🌐] Fetching IP and location data (IP-based only)...', 'info');
+        
+        // List of reliable IP geolocation APIs
+        const apis = [
+            {
+                url: 'https://ipapi.co/json/',
+                parser: (data) => ({ 
+                    ip: data.ip || 'unknown',
+                    city: data.city || 'unknown',
+                    region: data.region || 'unknown',
+                    country: data.country_name || 'unknown',
+                    country_code: data.country || 'unknown',
+                    lat: data.latitude || '0',
+                    lon: data.longitude || '0',
+                    isp: data.org || 'unknown',
+                    timezone: data.timezone || 'unknown',
+                    zip: data.postal || 'unknown',
+                    source: 'ipapi.co'
+                })
+            },
+            {
+                url: 'https://ipinfo.io/json',
+                parser: (data) => {
+                    const loc = data.loc ? data.loc.split(',') : ['0', '0'];
+                    return {
+                        ip: data.ip || 'unknown',
+                        city: data.city || 'unknown',
+                        region: data.region || 'unknown',
+                        country: data.country || 'unknown',
+                        country_code: data.country || 'unknown',
+                        lat: loc[0] || '0',
+                        lon: loc[1] || '0',
+                        isp: data.org || 'unknown',
+                        timezone: data.timezone || 'unknown',
+                        zip: data.postal || 'unknown',
+                        source: 'ipinfo.io'
+                    };
+                }
+            },
+            {
+                url: 'https://api.ipgeolocation.io/ipgeo',
+                parser: (data) => ({
+                    ip: data.ip || 'unknown',
+                    city: data.city || 'unknown',
+                    region: data.state_prov || 'unknown',
+                    country: data.country_name || 'unknown',
+                    country_code: data.country_code2 || 'unknown',
+                    lat: data.latitude || '0',
+                    lon: data.longitude || '0',
+                    isp: data.isp || 'unknown',
+                    timezone: data.time_zone?.name || 'unknown',
+                    zip: data.zipcode || 'unknown',
+                    source: 'ipgeolocation.io'
+                })
+            },
+            {
+                url: 'https://ip-api.com/json/',
+                parser: (data) => ({
+                    ip: data.query || 'unknown',
+                    city: data.city || 'unknown',
+                    region: data.regionName || 'unknown',
+                    country: data.country || 'unknown',
+                    country_code: data.countryCode || 'unknown',
+                    lat: data.lat || '0',
+                    lon: data.lon || '0',
+                    isp: data.isp || 'unknown',
+                    timezone: data.timezone || 'unknown',
+                    zip: data.zip || 'unknown',
+                    source: 'ip-api.com'
+                })
+            },
+            {
+                url: 'https://api.ip2location.io/?format=json',
+                parser: (data) => ({
+                    ip: data.ip || 'unknown',
+                    city: data.city_name || 'unknown',
+                    region: data.region_name || 'unknown',
+                    country: data.country_name || 'unknown',
+                    country_code: data.country_code || 'unknown',
+                    lat: data.latitude || '0',
+                    lon: data.longitude || '0',
+                    isp: data.isp || 'unknown',
+                    timezone: data.time_zone || 'unknown',
+                    zip: data.zip_code || 'unknown',
+                    source: 'ip2location.io'
+                })
+            }
+        ];
 
-    fetch('http://ip-api.com/json/')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
+        let currentApiIndex = 0;
+        let dataFound = false;
+
+        function tryNextApi() {
+            if (currentApiIndex >= apis.length) {
+                appendLog('[❌] All IP APIs failed to get location data', 'error');
+                // Fallback: try to get just IP
+                getIPOnly();
+                return;
             }
-            return response.json();
-        })
-        .then(data => {
-            if (data.status === 'success') {
-                // Display IP
-                appendLog(`[🌐] IP Address: ${data.query}`, 'ip');
+
+            const api = apis[currentApiIndex];
+            appendLog(`[🔄] Trying ${api.url}...`, 'warning');
+
+            fetch(api.url, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(data => {
+                const parsed = api.parser(data);
+                if (!parsed || !parsed.ip || parsed.ip === 'unknown' || parsed.ip === '0.0.0.0') {
+                    throw new Error('Invalid data');
+                }
                 
-                // Display location details
-                appendLog(`[📍] Location: ${data.city}, ${data.regionName}, ${data.country}`, 'location');
-                appendLog(`[📍] Coordinates: ${data.lat}, ${data.lon}`, 'location');
-                appendLog(`[📍] ISP: ${data.isp}`, 'location');
-                appendLog(`[📍] Timezone: ${data.timezone}`, 'location');
-                appendLog(`[📍] ZIP Code: ${data.zip}`, 'location');
-                
-                // Store in sessionStorage
-                try {
-                    sessionStorage.setItem('ip_info', JSON.stringify(data));
-                } catch(e) {}
-                
-                appendLog('[✅] IP and location data captured', 'success');
-            } else {
-                appendLog('[❌] Failed to get location data: ' + data.message, 'error');
-            }
-        })
-        .catch(error => {
-            appendLog('[❌] Error fetching IP: ' + error.message, 'error');
+                displayIPData(parsed);
+                dataFound = true;
+                ipDataCaptured = true;
+                return true;
+            })
+            .catch(error => {
+                appendLog(`[❌] API ${currentApiIndex + 1} failed: ${error.message}`, 'error');
+                currentApiIndex++;
+                tryNextApi();
+            });
+        }
+
+        function displayIPData(data) {
+            // Display IP
+            appendLog(`[🌐] IP Address: ${data.ip} (from ${data.source})`, 'ip');
             
-            // Fallback: try alternative API
-            appendLog('[🔄] Trying fallback API...', 'warning');
+            // Display location
+            appendLog(`[📍] Location: ${data.city}, ${data.region}, ${data.country} (${data.country_code})`, 'location');
+            
+            if (data.lat && data.lon && data.lat !== '0' && data.lon !== '0') {
+                appendLog(`[📍] Coordinates: ${data.lat}, ${data.lon}`, 'location');
+                
+                // Generate Google Maps link
+                const mapsLink = `https://www.google.com/maps?q=${data.lat},${data.lon}`;
+                appendLog(`[📍] Maps: ${mapsLink}`, 'location');
+            }
+            
+            if (data.isp && data.isp !== 'unknown') {
+                appendLog(`[📍] ISP: ${data.isp}`, 'location');
+            }
+            
+            if (data.timezone && data.timezone !== 'unknown') {
+                appendLog(`[📍] Timezone: ${data.timezone}`, 'location');
+            }
+            
+            if (data.zip && data.zip !== 'unknown') {
+                appendLog(`[📍] ZIP Code: ${data.zip}`, 'location');
+            }
+            
+            // Store in sessionStorage
+            try {
+                sessionStorage.setItem('ip_location_data', JSON.stringify(data));
+            } catch(e) {}
+            
+            appendLog('[✅] IP location data captured', 'success');
+            
+            // Try to get approximate distance from a known point (just for fun)
+            if (data.lat && data.lon && data.lat !== '0' && data.lon !== '0') {
+                const lat = parseFloat(data.lat);
+                const lon = parseFloat(data.lon);
+                // Approximate distance from equator (rough)
+                const dist = Math.abs(lat) * 111; // ~111km per degree
+                appendLog(`[📍] Approx distance from equator: ${dist.toFixed(0)} km`, 'info');
+            }
+        }
+
+        function getIPOnly() {
+            // Last resort: get only IP without location
+            appendLog('[🔄] Trying to get IP only...', 'warning');
+            
             fetch('https://api.ipify.org?format=json')
                 .then(res => res.json())
                 .then(data => {
-                    appendLog(`[🌐] IP Address (fallback): ${data.ip}`, 'ip');
+                    if (data.ip) {
+                        appendLog(`[🌐] IP Address: ${data.ip} (ipify.org)`, 'ip');
+                        appendLog('[⚠️] Location data unavailable from this API', 'warning');
+                        
+                        // Try one more location API with just the IP
+                        fetch(`http://ip-api.com/json/${data.ip}`)
+                            .then(res => res.json())
+                            .then(locData => {
+                                if (locData.status === 'success') {
+                                    appendLog(`[📍] Location: ${locData.city}, ${locData.regionName}, ${locData.country}`, 'location');
+                                    appendLog(`[📍] Coordinates: ${locData.lat}, ${locData.lon}`, 'location');
+                                    appendLog(`[📍] ISP: ${locData.isp}`, 'location');
+                                    
+                                    try {
+                                        sessionStorage.setItem('ip_location_data', JSON.stringify(locData));
+                                    } catch(e) {}
+                                    
+                                    ipDataCaptured = true;
+                                    appendLog('[✅] IP location data captured (fallback)', 'success');
+                                }
+                            })
+                            .catch(() => {
+                                appendLog('[❌] Location data unavailable', 'error');
+                            });
+                    }
                 })
                 .catch(err => {
-                    appendLog('[❌] Fallback also failed: ' + err.message, 'error');
+                    appendLog('[❌] Failed to get IP: ' + err.message, 'error');
                 });
-        });
+        }
+
+        // Start trying APIs
+        tryNextApi();
+    }
 
     // 3. Document Cookies
     function showCookies() {
@@ -163,7 +334,6 @@
         appendLog('[🍪] document.cookie:', 'cookie');
         appendLog(`[🍪] ${cookieStr}`, 'cookie');
         
-        // Try to parse cookies
         if (document.cookie !== '') {
             try {
                 var cookies = document.cookie.split(';');
@@ -175,7 +345,6 @@
                 });
             } catch(e) {}
         } else {
-            // Set test cookie if empty
             document.cookie = "poc_test=1; path=/";
             appendLog('[🍪] Test cookie set: poc_test=1', 'cookie');
             appendLog('[🍪] Cookie now: ' + document.cookie, 'cookie');
@@ -193,12 +362,15 @@
         else if (ua.indexOf('Opera') > -1) browser = 'Opera';
         
         appendLog(`[🖥️] Browser: ${browser}`, 'info');
-        appendLog(`[📱] User Agent: ${ua.substring(0, 60)}...`, 'info');
+        appendLog(`[📱] User Agent: ${ua}`, 'info');
         appendLog(`[📐] Screen: ${screen.width}x${screen.height}`, 'info');
         appendLog(`[💾] Language: ${navigator.language}`, 'info');
+        appendLog(`[🕐] Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, 'info');
     }
 
-    // 5. Execute everything with delays
+    // 5. Execute everything
+    getIPAndLocation();
+    
     setTimeout(() => {
         showCookies();
     }, 500);
@@ -207,27 +379,25 @@
         getBrowserInfo();
     }, 800);
 
-    // 6. Final status after all data is gathered
+    // 6. Final status
     setTimeout(() => {
         appendLog('', 'info');
         appendLog('═══════════════════════════════════', 'info');
         appendLog('[✅] PoC Complete', 'success');
         appendLog('[🔑] All data captured:', 'success');
-        appendLog('   • IP & Location ✓', 'success');
+        appendLog('   • IP Location (IP-based) ✓', 'success');
         appendLog('   • Cookies ✓', 'success');
         appendLog('   • Browser Info ✓', 'success');
         appendLog('[💾] Data stored in sessionStorage', 'success');
         
-        // Try to get saved IP data
+        // Check if we have stored data
         try {
-            var saved = sessionStorage.getItem('ip_info');
-            if (saved) {
-                var parsed = JSON.parse(saved);
-                appendLog(`[📊] Full Data: ${saved.substring(0, 100)}...`, 'info');
+            var stored = sessionStorage.getItem('ip_location_data');
+            if (stored) {
+                appendLog('[📊] Location data saved in sessionStorage', 'success');
             }
         } catch(e) {}
         
-        // Add live status dot
         const statusDiv = document.createElement('div');
         statusDiv.style.cssText = 'margin-top: 10px; display: flex; align-items: center;';
         statusDiv.innerHTML = `
@@ -235,7 +405,7 @@
             <span style="color: #00ff88; font-size: 12px;">Live - Data captured</span>
         `;
         logElement.appendChild(statusDiv);
-    }, 1500);
+    }, 3000);
 
 })();
 </script>
